@@ -3,7 +3,7 @@ const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl("mainnet-b
 const goalUSD = 20000;
 
 const PURPE_MINT = "HBoNJ5v8g71s2boRivrHnfSB5MVPLDHHyVjruPfhGkvL";
-const PYUSD_MINT = "2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsFu24GXo";
+const PYUSD_MINT = "5KdM72GCe2TqcczLs1BdKx4445tXrRBv9oa8s8T6pump"; // Das ist die korrekte Adresse laut deinem Screenshot!
 
 const trackedMints = {
   [PURPE_MINT]: { name: "PURPE", decimals: 1, coingecko: "custom", fallbackPrice: 0.00003761 },
@@ -43,6 +43,7 @@ async function fetchBalance() {
     let totalUSD = 0;
     let breakdown = "";
 
+    // Native SOL
     const solBalance = await connection.getBalance(owner);
     const solAmount = solBalance / solanaWeb3.LAMPORTS_PER_SOL;
     const solPrice = await fetchSolPrice();
@@ -65,6 +66,8 @@ async function fetchBalance() {
         const valueUSD = realAmount * price;
         totalUSD += valueUSD;
         breakdown += `${tokenInfo.name}: $${valueUSD.toFixed(2)}<br>`;
+      } else {
+        console.log("Unbekannter Token gefunden:", mint, rawAmount);
       }
     }
 
@@ -72,11 +75,13 @@ async function fetchBalance() {
     document.getElementById("current-amount").textContent = `$${totalUSD.toFixed(2)}`;
     document.getElementById("progress-fill").style.width = `${percent}%`;
     document.getElementById("breakdown").innerHTML = breakdown;
+
     const now = new Date();
     document.getElementById("last-updated").textContent =
       "Letztes Update: " + now.toLocaleTimeString();
   } catch (err) {
-    console.error("Wallet Fehler:", err);
+    console.error("Fehler beim Abrufen:", err);
+    document.getElementById("last-updated").textContent = "Fehler beim Update.";
   }
 }
 
