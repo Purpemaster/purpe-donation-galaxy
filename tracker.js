@@ -1,3 +1,7 @@
+window.onerror = function (msg, url, line, col, error) {
+  document.getElementById("last-updated").textContent = `JS Fehler: ${msg}`;
+  return false;
+};
 const walletAddress = "9uo3TB4a8synap9VMNpby6nzmnMs9xJWmgo2YKJHZWVn";
 const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl("mainnet-beta"));
 const goalUSD = 20000;
@@ -86,4 +90,6 @@ async function fetchBalance() {
 }
 
 fetchBalance();
+console.log("Tracker startet, Wallet:", walletAddress);
+console.log("Token Accounts gefunden:", tokenAccounts.value.length);
 setInterval(fetchBalance, 60000);
