@@ -1,3 +1,4 @@
+// Fehler direkt anzeigen
 window.onerror = function (msg, url, line, col, error) {
   document.getElementById("last-updated").textContent = `JS Fehler: ${msg}`;
   return false;
@@ -11,8 +12,8 @@ const PURPE_MINT = "HBoNJ5v8g71s2boRivrHnfSB5MVPLDHHyVjruPfhGkvL";
 const PYUSD_MINT = "5KdM72GCe2TqcczLs1BdKx4445tXrRBv9oa8s8T6pump";
 
 const trackedMints = {
-  [PURPE_MINT]: { name: "PURPE", decimals: 1, coingecko: "custom", fallbackPrice: 0.00003761 },
-  [PYUSD_MINT]: { name: "PYUSD", decimals: 6, coingecko: "usd", fallbackPrice: 1.0 }
+  [PURPE_MINT]: { name: "PURPE", decimals: 1, fallbackPrice: 0.00003761 },
+  [PYUSD_MINT]: { name: "PYUSD", decimals: 6, fallbackPrice: 1.0 }
 };
 
 async function fetchSolPrice() {
@@ -40,6 +41,7 @@ async function fetchPurpePrice() {
 async function fetchBalance() {
   try {
     console.log("Starte Balance-Fetch...");
+    if (typeof solanaWeb3 === "undefined") throw new Error("solanaWeb3 ist nicht verfügbar");
 
     const owner = new solanaWeb3.PublicKey(walletAddress);
     const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
@@ -52,6 +54,7 @@ async function fetchBalance() {
     let totalUSD = 0;
     let breakdown = "";
 
+    // SOL
     const solBalance = await connection.getBalance(owner);
     const solAmount = solBalance / solanaWeb3.LAMPORTS_PER_SOL;
     const solPrice = await fetchSolPrice();
@@ -59,6 +62,7 @@ async function fetchBalance() {
     totalUSD += solValue;
     breakdown += `SOL: $${solValue.toFixed(2)}<br>`;
 
+    // PURPE Price
     const purpePrice = await fetchPurpePrice();
 
     for (const acc of tokenAccounts.value) {
@@ -75,7 +79,7 @@ async function fetchBalance() {
         totalUSD += valueUSD;
         breakdown += `${tokenInfo.name}: $${valueUSD.toFixed(2)}<br>`;
       } else {
-        console.log("Unbekannter Token gefunden:", mint, rawAmount);
+        console.log("Unbekannter Token:", mint, rawAmount);
       }
     }
 
@@ -85,11 +89,10 @@ async function fetchBalance() {
     document.getElementById("breakdown").innerHTML = breakdown;
 
     const now = new Date();
-    document.getElementById("last-updated").textContent =
-      "Letztes Update: " + now.toLocaleTimeString();
+    document.getElementById("last-updated").textContent = "Letztes Update: " + now.toLocaleTimeString();
   } catch (err) {
     console.error("Fehler beim Abrufen:", err);
-    document.getElementById("last-updated").textContent = "Fehler beim Update.";
+    document.getElementById("last-updated").textContent = "Fehler beim Update: " + err.message;
   }
 }
 
