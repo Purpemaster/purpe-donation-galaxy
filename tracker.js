@@ -4,6 +4,7 @@ const goalUSD = 20000;
 
 const PURPE_MINT = "HBoNJ5v8g71s2boRivrHnfSB5MVPLDHHyVjruPfhGkvL";
 const PYUSD_MINT = "5KdM72GCe2TqcczLs1BdKx4445tXrRBv9oa8s8T6pump";
+const SOL_MINT = "So11111111111111111111111111111111111111112";
 
 async function fetchTokenList() {
   const res = await fetch(`https://public-api.solscan.io/v2/account/tokens?account=${walletAddress}`);
@@ -28,16 +29,12 @@ async function fetchSolBalance() {
   return (data?.data?.lamports || 0) / 1_000_000_000;
 }
 
-async function fetchSolPrice() {
-  return fetchTokenPrice("So11111111111111111111111111111111111111112"); // SOL wrapped token mint
-}
-
 async function updateTracker() {
   try {
     const [tokenList, solBalance, solPrice] = await Promise.all([
       fetchTokenList(),
       fetchSolBalance(),
-      fetchSolPrice()
+      fetchTokenPrice(SOL_MINT)
     ]);
 
     let totalUSD = 0;
