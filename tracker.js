@@ -2,12 +2,13 @@ window.onerror = function (msg, url, line, col, error) {
   document.getElementById("last-updated").textContent = `JS Fehler: ${msg}`;
   return false;
 };
+
 const walletAddress = "9uo3TB4a8synap9VMNpby6nzmnMs9xJWmgo2YKJHZWVn";
 const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl("mainnet-beta"));
 const goalUSD = 20000;
 
 const PURPE_MINT = "HBoNJ5v8g71s2boRivrHnfSB5MVPLDHHyVjruPfhGkvL";
-const PYUSD_MINT = "5KdM72GCe2TqcczLs1BdKx4445tXrRBv9oa8s8T6pump"; // Das ist die korrekte Adresse laut deinem Screenshot!
+const PYUSD_MINT = "5KdM72GCe2TqcczLs1BdKx4445tXrRBv9oa8s8T6pump";
 
 const trackedMints = {
   [PURPE_MINT]: { name: "PURPE", decimals: 1, coingecko: "custom", fallbackPrice: 0.00003761 },
@@ -38,16 +39,19 @@ async function fetchPurpePrice() {
 
 async function fetchBalance() {
   try {
+    console.log("Starte Balance-Fetch...");
+
     const owner = new solanaWeb3.PublicKey(walletAddress);
     const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
       owner,
       { programId: new solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA") }
     );
 
+    console.log("Token Accounts gefunden:", tokenAccounts.value.length);
+
     let totalUSD = 0;
     let breakdown = "";
 
-    // Native SOL
     const solBalance = await connection.getBalance(owner);
     const solAmount = solBalance / solanaWeb3.LAMPORTS_PER_SOL;
     const solPrice = await fetchSolPrice();
@@ -89,7 +93,6 @@ async function fetchBalance() {
   }
 }
 
-fetchBalance();
 console.log("Tracker startet, Wallet:", walletAddress);
-console.log("Token Accounts gefunden:", tokenAccounts.value.length);
+fetchBalance();
 setInterval(fetchBalance, 60000);
