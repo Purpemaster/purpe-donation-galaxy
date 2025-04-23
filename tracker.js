@@ -1,81 +1,67 @@
-// Fehler direkt anzeigen
-window.onerror = function (msg, url, line, col, error) {
-  document.getElementById("last-updated").textContent = `JS Fehler: ${msg}`;
-  return false;
-};
-
 const walletAddress = "9uo3TB4a8synap9VMNpby6nzmnMs9xJWmgo2YKJHZWVn";
-const connection = new solanaWeb3.Connection("https://rpc.helius.xyz/?api-key=2e046356-0f0c-4880-93cc-6d5467e81c73");
+const solscanApiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjcmVhdGVkQXQiOjE3NDU0MzcwNzcxNzcsImVtYWlsIjoibHVrYXMuZ2FzdGxAaWNsb3VkLmNvbSIsImFjdGlvbiI6InRva2VuLWFwaSIsImFwaVZlcnNpb24iOiJ2MiIsImlhdCI6MTc0NTQzNzA3N30.6LVCAxxFKTNzxEpwQGOtF3Vpzm-r-j-PKsdF7Spf7s4";
 const goalUSD = 20000;
 
 const PURPE_MINT = "HBoNJ5v8g71s2boRivrHnfSB5MVPLDHHyVjruPfhGkvL";
 const PYUSD_MINT = "5KdM72GCe2TqcczLs1BdKx4445tXrRBv9oa8s8T6pump";
 
-const trackedMints = {
-  [PURPE_MINT]: { name: "PURPE", decimals: 1 },
-  [PYUSD_MINT]: { name: "PYUSD", decimals: 6 }
-};
+async function fetchTokenList() {
+  const res = await fetch(`https://public-api.solscan.io/v2/account/tokens?account=${walletAddress}`);
+  const data = await res.json();
+  return data.data || [];
+}
+
+async function fetchTokenPrice(mint) {
+  const res = await fetch(`https://pro-api.solscan.io/v2.0/token/price?address=${mint}`, {
+    headers: {
+      accept: "application/json",
+      token: solscanApiKey
+    }
+  });
+  const data = await res.json();
+  return data?.data?.[0]?.price || 0;
+}
+
+async function fetchSolBalance() {
+  const res = await fetch(`https://public-api.solscan.io/v2/account?account=${walletAddress}`);
+  const data = await res.json();
+  return (data?.data?.lamports || 0) / 1_000_000_000;
+}
 
 async function fetchSolPrice() {
-  try {
-    const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd");
-    const data = await res.json();
-    return data.solana?.usd || 0;
-  } catch {
-    return 0;
-  }
+  return fetchTokenPrice("So11111111111111111111111111111111111111112"); // SOL wrapped token mint
 }
 
-async function fetchPurpePrice() {
+async function updateTracker() {
   try {
-    const res = await fetch(`https://public-api.birdeye.so/public/price?address=${PURPE_MINT}`, {
-      headers: { "X-API-KEY": "f80a250b67bc411dadbadadd6ecd2cf2" }
-    });
-    const data = await res.json();
-    return parseFloat(data?.data?.value) || 0;
-  } catch {
-    return 0;
-  }
-}
-
-async function fetchBalance() {
-  try {
-    const owner = new solanaWeb3.PublicKey(walletAddress);
-    const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
-      owner,
-      { programId: new solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA") }
-    );
+    const [tokenList, solBalance, solPrice] = await Promise.all([
+      fetchTokenList(),
+      fetchSolBalance(),
+      fetchSolPrice()
+    ]);
 
     let totalUSD = 0;
     let breakdown = "";
 
-    // Native SOL
-    const solBalance = await connection.getBalance(owner);
-    const solAmount = solBalance / solanaWeb3.LAMPORTS_PER_SOL;
-    const solPrice = await fetchSolPrice();
-    const solValue = solAmount * solPrice;
-    totalUSD += solValue;
-    breakdown += `SOL: $${solValue.toFixed(2)}<br>`;
+    // SOL first
+    const solUSD = solBalance * solPrice;
+    totalUSD += solUSD;
+    breakdown += `SOL: $${solUSD.toFixed(2)}<br>`;
 
-    const purpePrice = await fetchPurpePrice();
+    // Tokens
+    for (const token of tokenList) {
+      const { tokenAmount, tokenAddress } = token;
+      const mint = tokenAddress;
+      const amount = parseFloat(tokenAmount.amount);
+      const decimals = tokenAmount.decimals;
 
-    for (const acc of tokenAccounts.value) {
-      const info = acc.account.data.parsed.info;
-      const mint = info.mint;
-      const rawAmount = parseFloat(info.tokenAmount.amount);
-      const decimals = parseInt(info.tokenAmount.decimals);
-
-      if (trackedMints[mint]) {
-        const tokenInfo = trackedMints[mint];
-        const realAmount = rawAmount / Math.pow(10, decimals);
-        let price = 1.0;
-
-        if (mint === PURPE_MINT) price = purpePrice;
-        if (mint === PYUSD_MINT) price = 1.0; // PYUSD ist ein Stablecoin
-
-        const valueUSD = realAmount * price;
-        totalUSD += valueUSD;
-        breakdown += `${tokenInfo.name}: $${valueUSD.toFixed(2)}<br>`;
+      if (mint === PURPE_MINT || mint === PYUSD_MINT) {
+        const realAmount = amount / Math.pow(10, decimals);
+        const price = await fetchTokenPrice(mint);
+        const usdValue = realAmount * price;
+        totalUSD += usdValue;
+        const name = mint === PURPE_MINT ? "PURPE" : "PYUSD";
+        breakdown += `${name}: $${usdValue.toFixed(2)}<br>`;
       }
     }
 
@@ -87,10 +73,10 @@ async function fetchBalance() {
     const now = new Date();
     document.getElementById("last-updated").textContent = "Letztes Update: " + now.toLocaleTimeString();
   } catch (err) {
-    console.error("Fehler beim Abrufen:", err);
     document.getElementById("last-updated").textContent = "Fehler beim Update: " + err.message;
+    console.error("Update Fehler:", err);
   }
 }
 
-fetchBalance();
-setInterval(fetchBalance, 60000);
+updateTracker();
+setInterval(updateTracker, 15000);
