@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PURPE Donation Tracker</title>
+  <meta name="description" content="Live Donation Tracker for Purple Pepe on Solana – Real-time wallet tracking for PURPE, PYUSD and SOL." />
+  <meta name="theme-color" content="#00ffff" />
+  <title>PURPE Donation Galaxy</title>
+  <link rel="icon" type="image/png" href="pepe_background.png" />
   <link href="https://fonts.googleapis.com/css2?family=Orbitron&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -20,15 +23,16 @@
       <span id="goal-amount">$20000.00</span>
     </div>
 
-    <div class="update" id="last-updated">Lädt...</div>
+    <div class="update" id="last-updated">Loading...</div>
 
     <div class="info-box">
-      <p>Wallet: <code>9uo3TB4a8synap9VMNpby6nzmnMs9xJWmgo2YKJHZWVn</code></p>
+      <p>Wallet:</p>
+      <code id="wallet-address">9uo3TB4a8synap9VMNpby6nzmnMs9xJWmgo2YKJHZWVn</code>
       <p id="breakdown">---</p>
     </div>
   </div>
 
-  <!-- Solana Web3 und Tracker -->
+  <!-- Load Solana Web3 and custom tracker -->
   <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@1.82.0/lib/index.iife.min.js"></script>
   <script src="tracker.js"></script>
 </body>
