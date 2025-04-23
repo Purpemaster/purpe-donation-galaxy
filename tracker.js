@@ -1,4 +1,3 @@
-// Fehler direkt anzeigen
 window.onerror = function (msg, url, line, col, error) {
   document.getElementById("last-updated").textContent = `JS Fehler: ${msg}`;
   return false;
@@ -54,7 +53,6 @@ async function fetchBalance() {
     let totalUSD = 0;
     let breakdown = "";
 
-    // SOL
     const solBalance = await connection.getBalance(owner);
     const solAmount = solBalance / solanaWeb3.LAMPORTS_PER_SOL;
     const solPrice = await fetchSolPrice();
@@ -62,7 +60,6 @@ async function fetchBalance() {
     totalUSD += solValue;
     breakdown += `SOL: $${solValue.toFixed(2)}<br>`;
 
-    // PURPE Price
     const purpePrice = await fetchPurpePrice();
 
     for (const acc of tokenAccounts.value) {
@@ -78,8 +75,6 @@ async function fetchBalance() {
         const valueUSD = realAmount * price;
         totalUSD += valueUSD;
         breakdown += `${tokenInfo.name}: $${valueUSD.toFixed(2)}<br>`;
-      } else {
-        console.log("Unbekannter Token:", mint, rawAmount);
       }
     }
 
