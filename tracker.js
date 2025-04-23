@@ -1,13 +1,13 @@
 const walletAddress = "9uo3TB4a8synap9VMNpby6nzmnMs9xJWmgo2YKJHZWVn";
 const connection = new solanaWeb3.Connection("https://rpc.helius.xyz/?api-key=2e046356-0f0c-4880-93cc-6d5467e81c73");
+const goalUSD = 20000;
 
 const PURPE_MINT = "HBoNJ5v8g71s2boRivrHnfSB5MVPLDHHyVjruPfhGkvL";
 const PYUSD_MINT = "5KdM72GCe2TqcczLs1BdKx4445tXrRBv9oa8s8T6pump";
-const goalUSD = 20000;
 
-const mintMap = {
-  [PURPE_MINT]: { name: "PURPE" },
-  [PYUSD_MINT]: { name: "PYUSD" }
+const trackedMints = {
+  [PURPE_MINT]: { name: "PURPE", decimals: 1 },
+  [PYUSD_MINT]: { name: "PYUSD", decimals: 6 }
 };
 
 async function fetchSolPrice() {
@@ -16,18 +16,12 @@ async function fetchSolPrice() {
   return data.solana?.usd || 0;
 }
 
-async function fetchPYUSDPrice() {
-  const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=paypal-usd&vs_currencies=usd");
-  const data = await res.json();
-  return data["paypal-usd"]?.usd || 0;
-}
-
 async function fetchPurpePrice() {
   const res = await fetch(`https://public-api.birdeye.so/public/price?address=${PURPE_MINT}`, {
     headers: { "X-API-KEY": "f80a250b67bc411dadbadadd6ecd2cf2" }
   });
   const data = await res.json();
-  return parseFloat(data?.data?.value || 0);
+  return parseFloat(data?.data?.value || "0");
 }
 
 async function fetchBalance() {
@@ -42,26 +36,27 @@ async function fetchBalance() {
     const solPrice = await fetchSolPrice();
     const solUSD = solAmount * solPrice;
 
-    const purpePrice = await fetchPurpePrice();
-    const pyusdPrice = await fetchPYUSDPrice();
+    let purpePrice = await fetchPurpePrice();
 
     let totalUSD = solUSD;
     let breakdown = `SOL: $${solUSD.toFixed(2)}<br>`;
 
     for (const acc of tokenAccounts.value) {
-      const { mint, tokenAmount } = acc.account.data.parsed.info;
-      const realAmount = parseFloat(tokenAmount.amount) / Math.pow(10, tokenAmount.decimals);
-      let price = 0;
+      const info = acc.account.data.parsed.info;
+      const mint = info.mint;
+      const amountRaw = parseFloat(info.tokenAmount.amount);
+      const decimals = parseInt(info.tokenAmount.decimals);
 
-      if (mint === PURPE_MINT) price = purpePrice;
-      if (mint === PYUSD_MINT) price = pyusdPrice;
+      if (trackedMints[mint]) {
+        const realAmount = amountRaw / Math.pow(10, decimals);
+        let price = 1.0;
 
-      const name = mintMap[mint]?.name || mint.slice(0, 4) + "...";
-      const usdValue = realAmount * price;
+        if (mint === PURPE_MINT) price = purpePrice;
+        if (mint === PYUSD_MINT) price = 1.0; // fix auf echten Stablepreis
 
-      if (usdValue > 0) {
-        totalUSD += usdValue;
-        breakdown += `${name}: $${usdValue.toFixed(2)}<br>`;
+        const usd = realAmount * price;
+        totalUSD += usd;
+        breakdown += `${trackedMints[mint].name}: $${usd.toFixed(2)}<br>`;
       }
     }
 
@@ -74,9 +69,9 @@ async function fetchBalance() {
     document.getElementById("last-updated").textContent = "Letztes Update: " + now.toLocaleTimeString();
   } catch (err) {
     document.getElementById("last-updated").textContent = "Fehler: " + err.message;
-    console.error("Live Error:", err);
+    console.error("Tracker failt:", err);
   }
 }
 
 fetchBalance();
-setInterval(fetchBalance, 10000); // alle 10 Sekunden – brutal live
+setInterval(fetchBalance, 10000);
