@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Purple Pepe Donation Tracker</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="background"></div>
+  <div class="container">
+    <h1 class="title">Live Donation Tracker</h1>
+
+    <div class="progress-bar">
+      <div class="progress-fill" id="progress-fill"></div>
+    </div>
+
+    <div class="amounts">
+      <span id="current-amount">$0.00</span>
+      <span id="goal-amount">$20000.00</span>
+    </div>
+
+    <div class="update" id="last-updated">Wird aktualisiert...</div>
+
+    <div class="info-box">
+      <p>Purple Pepe ist auf dem Weg zur Börsenunsterblichkeit.</p>
+      <p>Diese Wallet ist der Treibstoff. Deine Spende beschleunigt das Raumschiff.</p>
+      <p id="breakdown">SOL: $0.00<br>PURPE: $0.00<br>PYUSD: $0.00</p>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.js"></script>
+  <script src="tracker.js"></script>
+</body>
+</html>
