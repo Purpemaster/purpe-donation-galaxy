@@ -1,3 +1,9 @@
+// Fehler direkt anzeigen
+window.onerror = function (msg, url, line, col, error) {
+  document.getElementById("last-updated").textContent = `JS Fehler: ${msg}`;
+  return false;
+};
+
 const walletAddress = "9uo3TB4a8synap9VMNpby6nzmnMs9xJWmgo2YKJHZWVn";
 const connection = new solanaWeb3.Connection("https://rpc.helius.xyz/?api-key=2e046356-0f0c-4880-93cc-6d5467e81c73");
 const goalUSD = 20000;
@@ -11,52 +17,65 @@ const trackedMints = {
 };
 
 async function fetchSolPrice() {
-  const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd");
-  const data = await res.json();
-  return data.solana?.usd || 0;
+  try {
+    const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd");
+    const data = await res.json();
+    return data.solana?.usd || 0;
+  } catch {
+    return 0;
+  }
 }
 
 async function fetchPurpePrice() {
-  const res = await fetch(`https://public-api.birdeye.so/public/price?address=${PURPE_MINT}`, {
-    headers: { "X-API-KEY": "f80a250b67bc411dadbadadd6ecd2cf2" }
-  });
-  const data = await res.json();
-  return parseFloat(data?.data?.value || "0");
+  try {
+    const res = await fetch(`https://public-api.birdeye.so/public/price?address=${PURPE_MINT}`, {
+      headers: { "X-API-KEY": "f80a250b67bc411dadbadadd6ecd2cf2" }
+    });
+    const data = await res.json();
+    return parseFloat(data?.data?.value) || 0;
+  } catch {
+    return 0;
+  }
 }
 
 async function fetchBalance() {
   try {
     const owner = new solanaWeb3.PublicKey(walletAddress);
-    const tokenAccounts = await connection.getParsedTokenAccountsByOwner(owner, {
-      programId: new solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
-    });
+    const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
+      owner,
+      { programId: new solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA") }
+    );
 
+    let totalUSD = 0;
+    let breakdown = "";
+
+    // Native SOL
     const solBalance = await connection.getBalance(owner);
     const solAmount = solBalance / solanaWeb3.LAMPORTS_PER_SOL;
     const solPrice = await fetchSolPrice();
-    const solUSD = solAmount * solPrice;
+    const solValue = solAmount * solPrice;
+    totalUSD += solValue;
+    breakdown += `SOL: $${solValue.toFixed(2)}<br>`;
 
-    let purpePrice = await fetchPurpePrice();
-
-    let totalUSD = solUSD;
-    let breakdown = `SOL: $${solUSD.toFixed(2)}<br>`;
+    const purpePrice = await fetchPurpePrice();
 
     for (const acc of tokenAccounts.value) {
       const info = acc.account.data.parsed.info;
       const mint = info.mint;
-      const amountRaw = parseFloat(info.tokenAmount.amount);
+      const rawAmount = parseFloat(info.tokenAmount.amount);
       const decimals = parseInt(info.tokenAmount.decimals);
 
       if (trackedMints[mint]) {
-        const realAmount = amountRaw / Math.pow(10, decimals);
+        const tokenInfo = trackedMints[mint];
+        const realAmount = rawAmount / Math.pow(10, decimals);
         let price = 1.0;
 
         if (mint === PURPE_MINT) price = purpePrice;
-        if (mint === PYUSD_MINT) price = 1.0; // fix auf echten Stablepreis
+        if (mint === PYUSD_MINT) price = 1.0; // PYUSD ist ein Stablecoin
 
-        const usd = realAmount * price;
-        totalUSD += usd;
-        breakdown += `${trackedMints[mint].name}: $${usd.toFixed(2)}<br>`;
+        const valueUSD = realAmount * price;
+        totalUSD += valueUSD;
+        breakdown += `${tokenInfo.name}: $${valueUSD.toFixed(2)}<br>`;
       }
     }
 
@@ -68,10 +87,10 @@ async function fetchBalance() {
     const now = new Date();
     document.getElementById("last-updated").textContent = "Letztes Update: " + now.toLocaleTimeString();
   } catch (err) {
-    document.getElementById("last-updated").textContent = "Fehler: " + err.message;
-    console.error("Tracker failt:", err);
+    console.error("Fehler beim Abrufen:", err);
+    document.getElementById("last-updated").textContent = "Fehler beim Update: " + err.message;
   }
 }
 
 fetchBalance();
-setInterval(fetchBalance, 10000);
+setInterval(fetchBalance, 60000);
