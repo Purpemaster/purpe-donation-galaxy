@@ -1,74 +1,68 @@
 const walletAddress = "9uo3TB4a8synap9VMNpby6nzmnMs9xJWmgo2YKJHZWVn";
-const solscanApiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."; // Dein API-Key
 const goalUSD = 20000;
 
 const PURPE_MINT = "HBoNJ5v8g71s2boRivrHnfSB5MVPLDHHyVjruPfhGkvL";
 const PYUSD_MINT = "5KdM72GCe2TqcczLs1BdKx4445tXrRBv9oa8s8T6pump";
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 
-async function fetchTokenList() {
+const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('mainnet-beta'), "confirmed");
+
+async function fetchTokenAccounts() {
   try {
-    const res = await fetch(`https://public-api.solscan.io/v2/account/tokens?account=${walletAddress}`);
-    const data = await res.json();
-    return data.data || [];
+    const response = await connection.getParsedTokenAccountsByOwner(
+      new solanaWeb3.PublicKey(walletAddress),
+      { programId: new solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA") }
+    );
+    return response.value;
   } catch (err) {
-    console.error("Token list fetch failed:", err);
+    console.error("Failed to fetch token accounts:", err);
     return [];
   }
 }
 
-async function fetchTokenPrice(mint) {
+async function fetchSOLBalance() {
   try {
-    const res = await fetch(`https://pro-api.solscan.io/v2.0/token/price?address=${mint}`, {
-      headers: {
-        accept: "application/json",
-        token: solscanApiKey
-      }
-    });
-    const data = await res.json();
-    return data?.data?.[0]?.price || 0;
+    const balance = await connection.getBalance(new solanaWeb3.PublicKey(walletAddress));
+    return balance / solanaWeb3.LAMPORTS_PER_SOL;
   } catch (err) {
-    console.error(`Price fetch failed for ${mint}:`, err);
+    console.error("Failed to fetch SOL balance:", err);
     return 0;
   }
 }
 
-async function fetchSolBalance() {
+async function fetchTokenPrice(mintAddress) {
   try {
-    const res = await fetch(`https://public-api.solscan.io/v2/account?account=${walletAddress}`);
-    const data = await res.json();
-    return (data?.data?.lamports || 0) / 1_000_000_000;
+    const response = await fetch(`https://price.jup.ag/v4/price?ids=${mintAddress}`);
+    const data = await response.json();
+    return data?.data?.[mintAddress]?.price || 0;
   } catch (err) {
-    console.error("SOL balance fetch failed:", err);
+    console.error("Price fetch failed for", mintAddress, err);
     return 0;
   }
 }
 
 async function updateTracker() {
   try {
-    const [tokenList, solBalance, solPrice] = await Promise.all([
-      fetchTokenList(),
-      fetchSolBalance(),
+    const [tokenAccounts, solBalance, solPrice] = await Promise.all([
+      fetchTokenAccounts(),
+      fetchSOLBalance(),
       fetchTokenPrice(SOL_MINT)
     ]);
 
     let totalUSD = solBalance * solPrice;
     let breakdown = `SOL: $${(totalUSD).toFixed(2)}<br>`;
 
-    for (const token of tokenList) {
-      const tokenAmount = token.tokenAmount;
-      const mint = token.tokenAddress?.address || token.tokenAddress;
+    for (const account of tokenAccounts) {
+      const info = account.account.data.parsed.info;
+      const mint = info.mint;
+      const amount = parseFloat(info.tokenAmount.amount);
+      const decimals = info.tokenAmount.decimals;
+      const realAmount = amount / Math.pow(10, decimals);
 
-      if (!tokenAmount || !mint) continue;
-
-      if (mint === PURPE_MINT || mint === PYUSD_MINT) {
-        const amount = parseFloat(tokenAmount.amount);
-        const decimals = tokenAmount.decimals;
-        const realAmount = amount / Math.pow(10, decimals);
+      if ([PURPE_MINT, PYUSD_MINT].includes(mint)) {
         const price = await fetchTokenPrice(mint);
         const usdValue = realAmount * price;
         totalUSD += usdValue;
-
         const name = mint === PURPE_MINT ? "PURPE" : "PYUSD";
         breakdown += `${name}: $${usdValue.toFixed(2)}<br>`;
       }
@@ -84,7 +78,7 @@ async function updateTracker() {
 
   } catch (err) {
     document.getElementById("last-updated").textContent = "Fehler beim Update: " + err.message;
-    console.error("UpdateTracker error:", err);
+    console.error("updateTracker error:", err);
   }
 }
 
