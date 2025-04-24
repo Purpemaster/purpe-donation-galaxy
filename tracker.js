@@ -9,6 +9,7 @@ async function fetchTokenList() {
   try {
     const res = await fetch(`https://public-api.solscan.io/v2/account/tokens?account=${walletAddress}`);
     const data = await res.json();
+    console.log(">>> API-Response von Tokenliste:", data);
     return data?.data || [];
   } catch (err) {
     console.error("Fehler beim Token-Fetch:", err);
@@ -20,6 +21,7 @@ async function fetchTokenPrice(mint) {
   try {
     const res = await fetch(`https://price.jup.ag/v4/price?ids=${mint}`);
     const data = await res.json();
+    console.log(`>>> Preis für ${mint}:`, data?.data?.[mint]);
     return data?.data?.[mint]?.price || 0;
   } catch (err) {
     console.error(`Fehler beim Preis-Fetch für ${mint}:`, err);
@@ -29,14 +31,23 @@ async function fetchTokenPrice(mint) {
 
 async function updateTracker() {
   try {
+    console.log(">>> Tracker gestartet");
+    console.log("Wallet:", walletAddress);
+
     const tokens = await fetchTokenList();
+    console.log(">>> Tokenliste geladen:", tokens);
+
     let totalUSD = 0;
     let breakdown = "";
 
     for (const token of tokens) {
       const tokenAmount = token.tokenAmount;
       const mint = token.tokenAddress?.address || token.tokenAddress;
-      if (!tokenAmount || !mint) continue;
+
+      if (!tokenAmount || !mint) {
+        console.warn(">>> Token wird übersprungen (ungültig):", token);
+        continue;
+      }
 
       const amount = parseFloat(tokenAmount.amount);
       const decimals = tokenAmount.decimals;
@@ -51,8 +62,12 @@ async function updateTracker() {
                     : mint === PURPE_MINT ? "PURPE"
                     : "PYUSD";
         breakdown += `${name}: $${usdValue.toFixed(2)}<br>`;
+        console.log(`>>> ${name} gefunden – Betrag: ${realAmount}, USD: $${usdValue.toFixed(2)}`);
       }
     }
+
+    console.log(">>> Gesamtbetrag in USD:", totalUSD);
+    console.log(">>> Breakdown-Ausgabe:", breakdown);
 
     const percent = Math.min((totalUSD / goalUSD) * 100, 100);
     document.getElementById("current-amount").textContent = `$${totalUSD.toFixed(2)}`;
@@ -64,7 +79,7 @@ async function updateTracker() {
 
   } catch (err) {
     document.getElementById("last-updated").textContent = "Fehler beim Update: " + err.message;
-    console.error("UpdateTracker Fehler:", err);
+    console.error(">>> UpdateTracker Fehler:", err);
   }
 }
 
