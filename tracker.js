@@ -5,65 +5,51 @@ const PURPE_MINT = "HBoNJ5v8g71s2boRivrHnfSB5MVPLDHHyVjruPfhGkvL";
 const PYUSD_MINT = "5KdM72GCe2TqcczLs1BdKx4445tXrRBv9oa8s8T6pump";
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 
-const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('mainnet-beta'), "confirmed");
-
-async function fetchTokenAccounts() {
+async function fetchTokenList() {
   try {
-    const response = await connection.getParsedTokenAccountsByOwner(
-      new solanaWeb3.PublicKey(walletAddress),
-      { programId: new solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA") }
-    );
-    return response.value;
+    const res = await fetch(`https://public-api.solscan.io/v2/account/tokens?account=${walletAddress}`);
+    const data = await res.json();
+    return data?.data || [];
   } catch (err) {
-    console.error("Failed to fetch token accounts:", err);
+    console.error("Fehler beim Token-Fetch:", err);
     return [];
   }
 }
 
-async function fetchSOLBalance() {
+async function fetchTokenPrice(mint) {
   try {
-    const balance = await connection.getBalance(new solanaWeb3.PublicKey(walletAddress));
-    return balance / solanaWeb3.LAMPORTS_PER_SOL;
+    const res = await fetch(`https://price.jup.ag/v4/price?ids=${mint}`);
+    const data = await res.json();
+    return data?.data?.[mint]?.price || 0;
   } catch (err) {
-    console.error("Failed to fetch SOL balance:", err);
-    return 0;
-  }
-}
-
-async function fetchTokenPrice(mintAddress) {
-  try {
-    const response = await fetch(`https://price.jup.ag/v4/price?ids=${mintAddress}`);
-    const data = await response.json();
-    return data?.data?.[mintAddress]?.price || 0;
-  } catch (err) {
-    console.error("Price fetch failed for", mintAddress, err);
+    console.error(`Fehler beim Preis-Fetch für ${mint}:`, err);
     return 0;
   }
 }
 
 async function updateTracker() {
   try {
-    const [tokenAccounts, solBalance, solPrice] = await Promise.all([
-      fetchTokenAccounts(),
-      fetchSOLBalance(),
-      fetchTokenPrice(SOL_MINT)
-    ]);
+    const tokens = await fetchTokenList();
+    let totalUSD = 0;
+    let breakdown = "";
 
-    let totalUSD = solBalance * solPrice;
-    let breakdown = `SOL: $${(totalUSD).toFixed(2)}<br>`;
+    for (const token of tokens) {
+      const tokenAmount = token.tokenAmount;
+      const mint = token.tokenAddress?.address || token.tokenAddress;
+      if (!tokenAmount || !mint) continue;
 
-    for (const account of tokenAccounts) {
-      const info = account.account.data.parsed.info;
-      const mint = info.mint;
-      const amount = parseFloat(info.tokenAmount.amount);
-      const decimals = info.tokenAmount.decimals;
+      const amount = parseFloat(tokenAmount.amount);
+      const decimals = tokenAmount.decimals;
       const realAmount = amount / Math.pow(10, decimals);
 
-      if ([PURPE_MINT, PYUSD_MINT].includes(mint)) {
+      if ([PURPE_MINT, PYUSD_MINT, SOL_MINT].includes(mint)) {
         const price = await fetchTokenPrice(mint);
         const usdValue = realAmount * price;
         totalUSD += usdValue;
-        const name = mint === PURPE_MINT ? "PURPE" : "PYUSD";
+
+        const name = mint === SOL_MINT ? "SOL"
+                    : mint === PURPE_MINT ? "PURPE"
+                    : "PYUSD";
         breakdown += `${name}: $${usdValue.toFixed(2)}<br>`;
       }
     }
@@ -78,7 +64,7 @@ async function updateTracker() {
 
   } catch (err) {
     document.getElementById("last-updated").textContent = "Fehler beim Update: " + err.message;
-    console.error("updateTracker error:", err);
+    console.error("UpdateTracker Fehler:", err);
   }
 }
 
